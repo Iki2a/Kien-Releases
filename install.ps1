@@ -55,7 +55,6 @@ if ($existingPath -and (Test-Path -LiteralPath (Join-Path $existingPath 'current
         throw 'Uninstall the existing copy before selecting another installation folder.'
     }
     $InstallDirectory = $existingPath
-    Write-Host ('Existing installation: ' + $InstallDirectory)
 }
 if (-not $useGui) {
     if (-not $PSBoundParameters.ContainsKey('InstallDirectory') -and -not $InstallDirectory) {
@@ -65,7 +64,7 @@ if (-not $useGui) {
         $InstallDirectory.IndexOfAny([IO.Path]::GetInvalidPathChars()) -ge 0) { throw 'Choose an absolute folder on a local drive.' }
     $InstallDirectory = [IO.Path]::GetFullPath($InstallDirectory).TrimEnd('\')
     if ($InstallDirectory -eq [IO.Path]::GetPathRoot($InstallDirectory).TrimEnd('\')) { throw 'Select a folder inside the drive, such as D:\Apps\Kien.' }
-    Write-Host ('Installing ' + $release.tag_name + ' to ' + $InstallDirectory)
+    Write-Host ('Preparing Kien ' + $release.tag_name + '...')
 }
 else { Write-Host 'Setup will open so you can choose the installation folder using Browse.' }
 $temporary = Join-Path ([IO.Path]::GetTempPath()) ('KienDownload-' + [Guid]::NewGuid().ToString('N'))
@@ -73,7 +72,43 @@ $setupPath = Join-Path $temporary 'Kien-Setup.exe'
 New-Item -ItemType Directory -Path $temporary | Out-Null
 try {
     Write-Host 'Downloading Kien...'
-    Invoke-WebRequest -UseBasicParsing -Uri $downloadUri.AbsoluteUri -OutFile $setupPath -TimeoutSec 300
+    # WebClient streams to disk without PowerShell's large native progress panel.
+    $client = New-Object System.Net.WebClient
+    $clock = [Diagnostics.Stopwatch]::StartNew()
+    $downloadStarted = $false
+    try {
+        $client.Headers['User-Agent'] = 'Kien-Installer'
+        $downloadTask = $client.DownloadFileTaskAsync($downloadUri, $setupPath)
+        $downloadStarted = $true
+        $lastPercent = -1
+        $interactive = -not [Console]::IsOutputRedirected
+        while (-not $downloadTask.IsCompleted) {
+            if ($clock.Elapsed.TotalSeconds -ge 300) {
+                $client.CancelAsync()
+                throw 'The installer download timed out. Please retry.'
+            }
+            $received = if (Test-Path -LiteralPath $setupPath) { (Get-Item -LiteralPath $setupPath).Length } else { 0 }
+            if ([long]$asset.size -gt 0) {
+                $percent = [int][Math]::Min(99, [Math]::Floor(100.0 * $received / [long]$asset.size))
+                if ($interactive -and $percent -ne $lastPercent) {
+                    $filled = [int][Math]::Floor($percent / 5)
+                    Write-Host ("`rDownloading [" + ('#' * $filled) + ('-' * (20 - $filled)) + ('] {0,3}%' -f $percent)) -NoNewline
+                    $lastPercent = $percent
+                }
+            }
+            elseif ($interactive) {
+                Write-Host ("`rDownloading [{0,6:N1} MB received]" -f ($received / 1MB)) -NoNewline
+            }
+            Start-Sleep -Milliseconds 150
+        }
+        $downloadTask.GetAwaiter().GetResult()
+        Write-Host ("`rDownloading [####################] 100%") -NoNewline
+    }
+    finally {
+        $client.Dispose()
+        $clock.Stop()
+        if ($downloadStarted) { Write-Host '' }
+    }
     if ((Get-FileHash -LiteralPath $setupPath -Algorithm SHA256).Hash -ne $expectedHash) { throw 'Installer checksum verification failed.' }
     $signature = Get-AuthenticodeSignature -LiteralPath $setupPath
     if ($signature.Status -eq 'NotSigned') {
@@ -96,7 +131,7 @@ try {
     if ($process.ExitCode -ne 0) { throw ('Kien installation failed with exit code ' + $process.ExitCode + '. Check the selected folder and close Kien before retrying.') }
     $executable = Join-Path $InstallDirectory 'current\Kien.exe'
     if (-not (Test-Path -LiteralPath $executable)) { throw 'Kien was not found in the selected folder after installation.' }
-    Write-Host ('Kien installed successfully: ' + $InstallDirectory)
+    Write-Host 'Kien installed successfully.'
     if (-not $NoLaunch) { Start-Process -FilePath $executable -WorkingDirectory (Split-Path $executable -Parent) -ArgumentList '--startup' }
 }
 finally {
