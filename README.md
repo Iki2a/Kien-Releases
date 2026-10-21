@@ -22,4 +22,15 @@ To try an installer while a developer copy is running, exit that copy from the t
 
 This repository contains release binaries and update metadata. Application source is maintained separately in a private repository.
 
-GitHub automatically generates source archive links for this distribution repository. Those archives contain this README, not the private Kien application source. Update packages contain compiled binaries and are used by the updater.
+GitHub automatically generates source archive links for this distribution repository. Those archives contain this README and the public installation helper, not the private Kien application source. Update packages contain compiled binaries and are used by the updater.
+
+
+## Install from PowerShell
+
+Run this command in PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/Iki2a/Kien-Releases/main/install.ps1 | iex
+```
+
+The command verifies the published installer and opens its **Browse** window so you can choose the drive and folder. A fully terminal-based installation can also use the helper with `-InstallDirectory`. The helper requires a published, signed installer and will not install unsigned draft builds.
