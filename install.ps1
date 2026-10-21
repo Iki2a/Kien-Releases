@@ -1,11 +1,12 @@
 #requires -Version 5.1
 param(
     [string]$InstallDirectory,
-    [switch]$NoLaunch
+    [switch]$NoLaunch,
+    [switch]$ShowSetup
 )
 $ErrorActionPreference = 'Stop'
-$useGui = -not $PSBoundParameters.ContainsKey('InstallDirectory')
-if ($useGui -and $NoLaunch) { throw '-NoLaunch requires -InstallDirectory.' }
+$useGui = [bool]$ShowSetup
+if ($useGui -and ($NoLaunch -or $PSBoundParameters.ContainsKey('InstallDirectory'))) { throw '-ShowSetup cannot be combined with -NoLaunch or -InstallDirectory.' }
 if ($env:OS -ne 'Windows_NT' -or -not [Environment]::Is64BitOperatingSystem) {
     throw 'Kien requires 64-bit Windows 10 or later.'
 }
@@ -57,6 +58,9 @@ if ($existingPath -and (Test-Path -LiteralPath (Join-Path $existingPath 'current
     Write-Host ('Existing installation: ' + $InstallDirectory)
 }
 if (-not $useGui) {
+    if (-not $PSBoundParameters.ContainsKey('InstallDirectory') -and -not $InstallDirectory) {
+        $InstallDirectory = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Kien'
+    }
     if ($InstallDirectory -notmatch '^[a-zA-Z]:[\\/]' -or $InstallDirectory.Contains('"') -or
         $InstallDirectory.IndexOfAny([IO.Path]::GetInvalidPathChars()) -ge 0) { throw 'Choose an absolute folder on a local drive.' }
     $InstallDirectory = [IO.Path]::GetFullPath($InstallDirectory).TrimEnd('\')
@@ -68,18 +72,16 @@ $temporary = Join-Path ([IO.Path]::GetTempPath()) ('KienDownload-' + [Guid]::New
 $setupPath = Join-Path $temporary 'Kien-Setup.exe'
 New-Item -ItemType Directory -Path $temporary | Out-Null
 try {
+    Write-Host 'Downloading Kien...'
     Invoke-WebRequest -UseBasicParsing -Uri $downloadUri.AbsoluteUri -OutFile $setupPath -TimeoutSec 300
     if ((Get-FileHash -LiteralPath $setupPath -Algorithm SHA256).Hash -ne $expectedHash) { throw 'Installer checksum verification failed.' }
     $signature = Get-AuthenticodeSignature -LiteralPath $setupPath
-    if ($signature.Status -eq 'NotSigned' -and $useGui) {
+    if ($signature.Status -eq 'NotSigned') {
         Write-Warning 'This Kien installer is not digitally signed. Windows cannot verify its publisher. The SHA-256 checksum matches the GitHub release, but this does not verify publisher identity.'
-        $confirmation = Read-Host 'Open the unsigned installer? Windows security warnings may appear. Type YES to continue (default: cancel)'
+        $confirmation = Read-Host 'Install this unsigned Kien release? Windows security warnings may appear. Type YES to continue (default: cancel)'
         if ($confirmation -cne 'YES') { Write-Host 'Installation cancelled.'; return }
     }
     elseif ($signature.Status -ne 'Valid') {
-        if ($signature.Status -eq 'NotSigned') {
-            throw 'The installer does not have a valid trusted signature. Silent installation requires a signed installer. For an unsigned release, run the default command to review the warning and open Setup interactively.'
-        }
         throw ('The installer does not have a valid trusted signature (status: ' + $signature.Status + '). Installation stopped.')
     }
     # Preserve the Internet zone so Windows can apply its normal downloaded-file checks.
@@ -89,6 +91,7 @@ try {
         if ($process.ExitCode -ne 0) { throw ('Kien Setup exited with code ' + $process.ExitCode + '.') }
         return
     }
+    Write-Host 'Installing Kien. Please wait...'
     $process = Start-Process -FilePath $setupPath -ArgumentList ('--silent --installto "' + $InstallDirectory + '"') -WindowStyle Hidden -Wait -PassThru
     if ($process.ExitCode -ne 0) { throw ('Kien installation failed with exit code ' + $process.ExitCode + '. Check the selected folder and close Kien before retrying.') }
     $executable = Join-Path $InstallDirectory 'current\Kien.exe'
