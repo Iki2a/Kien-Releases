@@ -5,6 +5,9 @@ param(
     [switch]$ShowSetup
 )
 $ErrorActionPreference = 'Stop'
+$previousProgressPreference = $ProgressPreference
+$ProgressPreference = 'SilentlyContinue'
+try {
 $useGui = [bool]$ShowSetup
 if ($useGui -and ($NoLaunch -or $PSBoundParameters.ContainsKey('InstallDirectory'))) { throw '-ShowSetup cannot be combined with -NoLaunch or -InstallDirectory.' }
 if ($env:OS -ne 'Windows_NT' -or -not [Environment]::Is64BitOperatingSystem) {
@@ -138,4 +141,8 @@ finally {
     # Only remove the known downloaded file and its empty temporary folder.
     if (Test-Path -LiteralPath $setupPath) { Remove-Item -LiteralPath $setupPath }
     if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $temporary }
+}
+}
+finally {
+    $ProgressPreference = $previousProgressPreference
 }
