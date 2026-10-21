@@ -79,7 +79,7 @@ try {
     if ($signature.Status -eq 'NotSigned') {
         Write-Warning 'This Kien installer is not digitally signed. Windows cannot verify its publisher. The SHA-256 checksum matches the GitHub release, but this does not verify publisher identity.'
         $confirmation = Read-Host 'Install this unsigned Kien release? Windows security warnings may appear. Type YES to continue (default: cancel)'
-        if ($confirmation -cne 'YES') { Write-Host 'Installation cancelled.'; return }
+        if (([string]$confirmation).Trim() -ine 'YES') { Write-Host 'Installation cancelled.'; return }
     }
     elseif ($signature.Status -ne 'Valid') {
         throw ('The installer does not have a valid trusted signature (status: ' + $signature.Status + '). Installation stopped.')
