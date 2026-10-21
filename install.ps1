@@ -71,7 +71,19 @@ try {
     Invoke-WebRequest -UseBasicParsing -Uri $downloadUri.AbsoluteUri -OutFile $setupPath -TimeoutSec 300
     if ((Get-FileHash -LiteralPath $setupPath -Algorithm SHA256).Hash -ne $expectedHash) { throw 'Installer checksum verification failed.' }
     $signature = Get-AuthenticodeSignature -LiteralPath $setupPath
-    if ($signature.Status -ne 'Valid') { throw 'The installer does not have a valid trusted signature. Installation stopped.' }
+    if ($signature.Status -eq 'NotSigned' -and $useGui) {
+        Write-Warning 'This Kien installer is not digitally signed. Windows cannot verify its publisher. The SHA-256 checksum matches the GitHub release, but this does not verify publisher identity.'
+        $confirmation = Read-Host 'Open the unsigned installer? Windows security warnings may appear. Type YES to continue (default: cancel)'
+        if ($confirmation -cne 'YES') { Write-Host 'Installation cancelled.'; return }
+    }
+    elseif ($signature.Status -ne 'Valid') {
+        if ($signature.Status -eq 'NotSigned') {
+            throw 'The installer does not have a valid trusted signature. Silent installation requires a signed installer. For an unsigned release, run the default command to review the warning and open Setup interactively.'
+        }
+        throw ('The installer does not have a valid trusted signature (status: ' + $signature.Status + '). Installation stopped.')
+    }
+    # Preserve the Internet zone so Windows can apply its normal downloaded-file checks.
+    Set-Content -LiteralPath $setupPath -Stream Zone.Identifier -Value ("[ZoneTransfer]`r`nZoneId=3`r`nHostUrl=" + $downloadUri.AbsoluteUri)
     if ($useGui) {
         $process = Start-Process -FilePath $setupPath -Wait -PassThru
         if ($process.ExitCode -ne 0) { throw ('Kien Setup exited with code ' + $process.ExitCode + '.') }
