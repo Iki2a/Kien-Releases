@@ -30,7 +30,7 @@ GitHub automatically generates source archive links for this distribution reposi
 Run this command in PowerShell:
 
 ```powershell
-& { $ProgressPreference = 'SilentlyContinue'; irm 'https://raw.githubusercontent.com/Iki2a/Kien-Releases/main/install.ps1?v=20261021-ascii2' | iex }
+& { $ProgressPreference = 'SilentlyContinue'; irm 'https://raw.githubusercontent.com/Iki2a/Kien-Releases/4ae835111e8067aba34e92d3eae4bf25e7b90c4c/install.ps1' | iex }
 ```
 
 The command downloads Kien, verifies its SHA-256 checksum, installs it to `%LOCALAPPDATA%\Kien`, and opens the application. It does not ask for an installation folder or open the Setup wizard. Existing installations keep their current folder.
