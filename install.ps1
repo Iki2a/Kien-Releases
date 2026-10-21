@@ -14,10 +14,29 @@ $repository = 'https://github.com/Iki2a/Kien-Releases'
 $headers = @{ 'User-Agent' = 'Kien-Installer'; 'Accept' = 'application/vnd.github+json' }
 Write-Host 'Kien - a floating notch for Windows'
 Write-Host 'Checking the latest published release...'
-try {
-    $release = Invoke-RestMethod -Uri 'https://api.github.com/repos/Iki2a/Kien-Releases/releases/latest' -Headers $headers -TimeoutSec 30
+for ($attempt = 1; $attempt -le 3; $attempt++) {
+    try {
+        $release = Invoke-RestMethod -Uri 'https://api.github.com/repos/Iki2a/Kien-Releases/releases/latest' -Headers $headers -TimeoutSec 30
+        break
+    }
+    catch {
+        $status = 0
+        if ($_.Exception.Response) { $status = [int]$_.Exception.Response.StatusCode }
+        if ($status -eq 404) {
+            throw ('GitHub returned HTTP 404: no public stable Kien release was found. See ' + $repository + '/releases')
+        }
+        if ($status -eq 403 -or $status -eq 429) {
+            throw ('GitHub returned HTTP ' + $status + ': access was denied or the request limit was reached. Wait before retrying, or download Kien-Setup.exe from ' + $repository + '/releases/latest')
+        }
+        if (($status -eq 0 -or $status -eq 408 -or $status -ge 500) -and $attempt -lt 3) {
+            Write-Host 'GitHub could not be reached. Retrying...'
+            Start-Sleep -Seconds (2 * $attempt)
+            continue
+        }
+        $detail = if ($status) { 'HTTP ' + $status } else { $_.Exception.Message }
+        throw ('Unable to check the Kien release (' + $detail + '). Check your connection, proxy, or firewall, then retry. Download page: ' + $repository + '/releases/latest')
+    }
 }
-catch { throw ('No public Kien release is available, or GitHub could not be reached. See ' + $repository + '/releases') }
 $asset = @($release.assets | Where-Object name -eq 'Kien-Setup.exe')
 if ($asset.Count -ne 1 -or $release.draft -or $release.prerelease) { throw 'No stable Kien installer is available.' }
 $asset = $asset[0]
