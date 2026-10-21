@@ -33,4 +33,4 @@ Run this command in PowerShell:
 irm https://raw.githubusercontent.com/Iki2a/Kien-Releases/main/install.ps1 | iex
 ```
 
-The command verifies the published installer and opens its **Browse** window so you can choose the drive and folder. A fully terminal-based installation can also use the helper with `-InstallDirectory`. The helper requires a published, signed installer and will not install unsigned draft builds.
+The command verifies the SHA-256 checksum of the published installer and opens its **Browse** window so you can choose the drive and folder. If the installer is unsigned, it explains that the publisher cannot be verified and requires you to type `YES` before opening Setup. The default is to cancel. Windows security warnings may still appear. Silent installation with `-InstallDirectory` requires a valid trusted signature. Invalid signatures and mismatched checksums are rejected. Draft releases are not installed.
