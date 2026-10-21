@@ -33,4 +33,8 @@ Run this command in PowerShell:
 irm https://raw.githubusercontent.com/Iki2a/Kien-Releases/main/install.ps1 | iex
 ```
 
-The command verifies the SHA-256 checksum of the published installer and opens its **Browse** window so you can choose the drive and folder. If the installer is unsigned, it explains that the publisher cannot be verified and requires you to type `YES` before opening Setup. The default is to cancel. Windows security warnings may still appear. Silent installation with `-InstallDirectory` requires a valid trusted signature. Invalid signatures and mismatched checksums are rejected. Draft releases are not installed.
+The command downloads Kien, verifies its SHA-256 checksum, installs it to `%LOCALAPPDATA%\Kien`, and opens the application. It does not ask for an installation folder or open the Setup wizard. Existing installations keep their current folder.
+
+For unsigned releases, the command explains that the publisher cannot be verified and requires you to type `YES` before installation. The default is to cancel. Windows security warnings may still appear. Invalid signatures and mismatched checksums are rejected. Draft releases are not installed.
+
+Advanced options: `-InstallDirectory` selects a custom folder, `-NoLaunch` skips opening Kien after installation, and `-ShowSetup` opens the optional folder-picker wizard. The downloadable EXE still provides the graphical installer.
